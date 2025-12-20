@@ -17,6 +17,9 @@ class VibeConverterApp(ctk.CTk):
         self.title("VibeConverter")
         self.geometry("600x500")
 
+        # Variables
+        self.batch_var = ctk.BooleanVar(value=False)
+
         # Layout configuration
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(2, weight=1)  # Log area expands
@@ -31,6 +34,16 @@ class VibeConverterApp(ctk.CTk):
 
         self.browse_button = ctk.CTkButton(self.input_frame, text="Browse", command=self.browse_file, width=80)
         self.browse_button.grid(row=0, column=1, padx=(5, 10), pady=10)
+
+        self.batch_mode_switch = ctk.CTkSwitch(self.input_frame, text="Batch Mode", variable=self.batch_var)
+        self.batch_mode_switch.grid(row=1, column=0, columnspan=2, padx=10, pady=(0, 10), sticky="w")
+
+        # --- Output Selection Row ---
+        self.output_path_entry = ctk.CTkEntry(self.input_frame, placeholder_text="Default (Source Folder)")
+        self.output_path_entry.grid(row=2, column=0, padx=(10, 5), pady=(0, 10), sticky="ew")
+
+        self.output_browse_button = ctk.CTkButton(self.input_frame, text="Browse Output...", command=self.browse_output, width=80)
+        self.output_browse_button.grid(row=2, column=1, padx=(5, 10), pady=(0, 10))
 
         # --- Options & Action Section ---
         self.action_frame = ctk.CTkFrame(self)
@@ -55,10 +68,20 @@ class VibeConverterApp(ctk.CTk):
         self.progress_bar.set(0)
 
     def browse_file(self):
-        filename = filedialog.askopenfilename()
-        if filename:
+        if self.batch_var.get():
+            target = filedialog.askdirectory(parent=self)
+        else:
+            target = filedialog.askopenfilename(parent=self)
+            
+        if target:
             self.file_path_entry.delete(0, "end")
-            self.file_path_entry.insert(0, filename)
+            self.file_path_entry.insert(0, target)
+
+    def browse_output(self):
+        target = filedialog.askdirectory(parent=self)
+        if target:
+            self.output_path_entry.delete(0, "end")
+            self.output_path_entry.insert(0, target)
 
     def get_ffmpeg_path(self):
         """
@@ -97,53 +120,95 @@ class VibeConverterApp(ctk.CTk):
     def start_conversion_thread(self):
         input_file = self.file_path_entry.get()
         if not input_file:
-            self.log_message("Error: Please select a file first.")
+            self.log_message("Error: Please select a file or folder first.")
             return
 
         target_format = self.format_menu.get()
+        is_batch = self.batch_var.get()
         
         # Disable button to prevent double clicks
         self.convert_button.configure(state="disabled")
         self.progress_bar.start()
         
-        conversion_thread = threading.Thread(target=self.run_conversion, args=(input_file, target_format))
+        conversion_thread = threading.Thread(target=self.run_conversion, args=(input_file, target_format, is_batch))
         conversion_thread.daemon = True
         conversion_thread.start()
 
-    def run_conversion(self, input_path, target_format):
+    def run_conversion(self, input_path, target_format, is_batch):
         try:
             ffmpeg_cmd = self.get_ffmpeg_path()
-            
-            # Simple output filename generation
-            dirname, filename = os.path.split(input_path)
-            name, _ = os.path.splitext(filename)
-            output_filename = f"{name}_converted.{target_format}"
-            output_path = os.path.join(dirname, output_filename)
+            files_to_convert = []
 
-            self.log_message(f"Starting conversion: {filename} -> {output_filename}")
-            
-            # Construct command
-            # -y overwrites output
-            command = [ffmpeg_cmd, "-i", input_path, "-y", output_path]
-            
-            process = subprocess.Popen(
-                command,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                universal_newlines=True
-            )
+            custom_output_dir = self.output_path_entry.get().strip()
+            if custom_output_dir == "Default (Source Folder)":
+                custom_output_dir = ""
 
-            # Read output log
-            for line in process.stdout:
-                if line:
-                    self.log_message(line.strip())
-            
-            process.wait()
-
-            if process.returncode == 0:
-                self.log_message(f"SUCCESS: Saved to {output_path}")
+            if is_batch:
+                if not os.path.isdir(input_path):
+                    self.log_message(f"ERROR: {input_path} is not a valid directory.")
+                    return
+                
+                # Video and Audio extensions
+                extensions = ('.mp4', '.mkv', '.avi', '.mov', '.flv', '.mp3', '.wav', '.aac', '.flac', '.m4a', '.ogg')
+                for f in os.listdir(input_path):
+                    if f.lower().endswith(extensions):
+                        files_to_convert.append(os.path.join(input_path, f))
+                
+                if not files_to_convert:
+                    self.log_message("ERROR: No compatible files found in folder.")
+                    return
+                
+                if custom_output_dir:
+                    output_dir = custom_output_dir
+                else:
+                    output_dir = os.path.join(input_path, "converted")
+                
+                os.makedirs(output_dir, exist_ok=True)
+                self.log_message(f"Batch mode started. Found {len(files_to_convert)} files.")
             else:
-                self.log_message(f"FAILURE: FFmpeg exited with code {process.returncode}")
+                files_to_convert = [input_path]
+                if custom_output_dir:
+                    output_dir = custom_output_dir
+                    os.makedirs(output_dir, exist_ok=True)
+                else:
+                    output_dir = os.path.dirname(input_path)
+
+            total_files = len(files_to_convert)
+
+            for i, current_file in enumerate(files_to_convert, 1):
+                filename = os.path.basename(current_file)
+                name, _ = os.path.splitext(filename)
+                output_filename = f"{name}_converted.{target_format}"
+                output_path = os.path.join(output_dir, output_filename)
+
+                if is_batch:
+                    self.log_message(f"\nProcessing file {i} of {total_files}: {filename}...")
+                else:
+                    self.log_message(f"Starting conversion: {filename} -> {output_filename}")
+
+                # Construct command
+                command = [ffmpeg_cmd, "-i", current_file, "-y", output_path]
+                
+                process = subprocess.Popen(
+                    command,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    universal_newlines=True
+                )
+
+                # Read output log
+                for line in process.stdout:
+                    if line and not is_batch: # Only flood log in single mode
+                        self.log_message(line.strip())
+                
+                process.wait()
+
+                if process.returncode == 0:
+                    self.log_message(f"SUCCESS: Saved to {output_path}")
+                else:
+                    self.log_message(f"FAILURE: FFmpeg exited with code {process.returncode} for {filename}")
+
+            self.log_message("\n--- Task Completed ---")
 
         except Exception as e:
             self.log_message(f"ERROR: {str(e)}")
