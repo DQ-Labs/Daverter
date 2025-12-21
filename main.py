@@ -94,7 +94,7 @@ class VibeConverterApp(ctk.CTk):
         elif sys.platform.startswith("win"):
             # Check for bundled executable (PyInstaller)
             if hasattr(sys, "_MEIPASS"):
-                bundled_path = os.path.join(sys._MEIPASS, "ffmpeg.exe")
+                bundled_path = os.path.join(sys._MEIPASS, "bin", "ffmpeg.exe")
                 if os.path.exists(bundled_path):
                     return bundled_path
             
@@ -137,6 +137,12 @@ class VibeConverterApp(ctk.CTk):
     def run_conversion(self, input_path, target_format, is_batch):
         try:
             ffmpeg_cmd = self.get_ffmpeg_path()
+            self.log_message(f"Debug: Using FFmpeg path: {ffmpeg_cmd}")
+
+            if not os.path.exists(ffmpeg_cmd):
+                 self.log_message(f"ERROR: FFmpeg not found at {ffmpeg_cmd}")
+                 return
+
             files_to_convert = []
 
             custom_output_dir = self.output_path_entry.get().strip()
@@ -189,11 +195,16 @@ class VibeConverterApp(ctk.CTk):
                 # Construct command
                 command = [ffmpeg_cmd, "-i", current_file, "-y", output_path]
                 
+                creation_flags = 0
+                if sys.platform.startswith("win"):
+                    creation_flags = subprocess.CREATE_NO_WINDOW
+
                 process = subprocess.Popen(
                     command,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
-                    universal_newlines=True
+                    universal_newlines=True,
+                    creationflags=creation_flags
                 )
 
                 # Read output log
