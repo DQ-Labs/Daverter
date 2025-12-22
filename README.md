@@ -1,8 +1,82 @@
-How to use this later
-On a new PC: 
-Clone the repo, 
-create venv,
-download FFmpeg into bin, run build.bat.
+# Daverter
 
-On Linux: 
-Pull the changes. The code is smart enough to ignore the Windows logic and still work on Linux!
+A modern, dark-mode GUI for FFmpeg built with Python and CustomTkinter. Daverter allows you to easily convert media files using a sleek interface, supporting both single-file and batch folder processing.
+
+## Features
+
+- **Modern Dark-Mode GUI**: Built with CustomTkinter for a native-looking, professional interface.
+- **Single File Conversion**: Quickly convert individual video or audio files.
+- **Batch Folder Mode**: Process entire directories of files at once (recursive).
+- **Custom Output Folder**: Choose where your converted files are saved, or default to a subfolder.
+- **Silent/Background Processing**: Conversions run in the background without annoying popup console windows.
+
+## Supported Formats
+
+### Input Formats (Read)
+Daverter validates and processes files with the following extensions:
+- **Video**: `.mp4`, `.mkv`, `.avi`, `.mov`, `.flv`
+- **Audio**: `.mp3`, `.wav`, `.aac`, `.flac`, `.m4a`, `.ogg`
+
+### Output Formats (Write)
+You can convert files to the following formats using the dropdown menu:
+- `mp4`
+- `mp3`
+- `gif`
+- `wav`
+- `mkv`
+
+## Developer Setup (Running from Source)
+
+### Prerequisites
+- **Python 3.x** installed.
+- **FFmpeg**: You must have `ffmpeg.exe` available.
+
+### Installation
+
+1.  **Clone the repository** (or extract the source).
+2.  **Install Dependencies**:
+    ```bash
+    pip install customtkinter
+    ```
+    (Note: `pyinstaller` is required if you plan to build the executable)
+
+3.  **FFmpeg Setup (Crucial)**:
+    -   Create a folder named `bin` in the project root directory.
+    -   Download `ffmpeg.exe` (from [ffmpeg.org](https://ffmpeg.org/download.html) or similar).
+    -   Place `ffmpeg.exe` inside the `bin/` folder.
+    -   Structure should look like:
+        ```
+        Daverter/
+        ├── bin/
+        │   └── ffmpeg.exe
+        ├── main.py
+        └── ...
+        ```
+
+4.  **Run the App**:
+    ```bash
+    python main.py
+    ```
+
+## Building for Windows
+
+To create a standalone `.exe` file that includes the FFmpeg binary:
+
+1.  Ensure you have `pyinstaller` installed:
+    ```bash
+    pip install pyinstaller
+    ```
+2.  Run the included build script:
+    ```cmd
+    build.bat
+    ```
+    Or manually run:
+    ```cmd
+    pyinstaller --noconfirm --onefile --windowed --name "Daverter" --add-data "bin/ffmpeg.exe;bin" --clean main.py
+    ```
+
+3.  **Locate the Executable**:
+    The finished `Daverter.exe` will be generated in the `dist/` folder.
+
+---
+*Powered by FFmpeg and CustomTkinter.*
