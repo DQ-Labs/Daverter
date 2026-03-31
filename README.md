@@ -1,6 +1,14 @@
-# Daverter
+# Daverter v0.2
 
 A modern, dark-mode GUI for FFmpeg built with Python and CustomTkinter. Daverter allows you to easily convert media files using a sleek interface, supporting both single-file and batch folder processing.
+
+## Downloads & Pre-Built Binaries
+
+You don't need Python or any development tools to run Daverter! Pre-compiled standalone applications are available:
+
+- [Download for Windows / Linux](../../releases/latest) (Check the repository Releases tab)
+
+---
 
 ## Features
 
@@ -77,6 +85,11 @@ To create a standalone `.exe` file that includes the FFmpeg binary:
 
 3.  **Locate the Executable**:
     The finished `Daverter.exe` will be generated in the `dist/` folder.
+
+## Version History
+
+- **v0.2**: Added automated cross-platform CI/CD builds (Windows and Linux binaries) via GitHub Actions.
+- **v0.1**: Initial release. Basic FFmpeg integration with CustomTkinter GUI.
 
 ---
 *Powered by FFmpeg and CustomTkinter.*

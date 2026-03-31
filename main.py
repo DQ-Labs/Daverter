@@ -6,16 +6,32 @@ import sys
 from tkinter import filedialog
 
 # Set appearance and theme
-ctk.set_appearance_mode("System")
+ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("blue")
+
+def resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
 
 class VibeConverterApp(ctk.CTk):
     def __init__(self):
         super().__init__()
 
         # Window setup
-        self.title("VibeConverter")
+        self.title("Daverter")
         self.geometry("600x500")
+        
+        try:
+            self.iconbitmap(resource_path("app.ico"))
+        except Exception as e:
+            print(f"Warning: Could not load icon: {e}")
+            pass # Icon optional
 
         # Variables
         self.batch_var = ctk.BooleanVar(value=False)
@@ -56,7 +72,9 @@ class VibeConverterApp(ctk.CTk):
         self.format_menu.set("mp4") # Default
         self.format_menu.grid(row=0, column=0, padx=20, pady=20)
 
-        self.convert_button = ctk.CTkButton(self.action_frame, text="Convert", command=self.start_conversion_thread)
+        self.convert_button = ctk.CTkButton(self.action_frame, text="Convert", command=self.start_conversion_thread,
+                                            fg_color="#009933", hover_color="#006622",
+                                            border_width=2, border_color="white")
         self.convert_button.grid(row=0, column=1, padx=20, pady=20)
 
         # --- Feedback Section ---
@@ -218,6 +236,14 @@ class VibeConverterApp(ctk.CTk):
                     self.log_message(f"SUCCESS: Saved to {output_path}")
                 else:
                     self.log_message(f"FAILURE: FFmpeg exited with code {process.returncode} for {filename}")
+
+            # Auto-open output folder
+            if sys.platform.startswith("win"):
+                try:
+                    os.startfile(output_dir)
+                    self.log_message(f"Opened output folder: {output_dir}")
+                except Exception as e:
+                    self.log_message(f"Could not open folder: {e}")
 
             self.log_message("\n--- Task Completed ---")
 
