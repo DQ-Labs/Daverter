@@ -89,7 +89,7 @@ class VibeConverterApp(ctk.CTk, TkinterDnD.DnDWrapper):
         self.action_frame.grid_columnconfigure(0, weight=1)
         self.action_frame.grid_columnconfigure(1, weight=1)
 
-        self.formats = ["mp4", "mp3", "gif", "wav", "mkv"]
+        self.formats = ["mp4", "mp3", "gif", "wav", "mkv", "flac", "aac", "webm", "mov"]
         self.format_menu = ctk.CTkOptionMenu(self.action_frame, values=self.formats)
         self.format_menu.set("mp4")
         self.format_menu.grid(row=0, column=0, padx=20, pady=20)
@@ -153,27 +153,39 @@ class VibeConverterApp(ctk.CTk, TkinterDnD.DnDWrapper):
     # File count preview
     # ------------------------------------------------------------------
 
+    # File type sets used for format auto-detection and batch scanning
+    VIDEO_EXTENSIONS = {'.mp4', '.mkv', '.avi', '.mov', '.flv', '.webm'}
+    AUDIO_EXTENSIONS = {'.mp3', '.wav', '.aac', '.flac', '.m4a', '.ogg'}
+
     def _on_batch_or_path_change(self, *args):
-        """Update the file count label whenever the path or batch toggle changes."""
-        if not self.batch_var.get():
-            self.file_count_label.configure(text="")
-            return
+        """Update file count label and auto-select output format when path or batch toggle changes."""
         path = self.input_path_var.get().strip()
-        if not path or not os.path.isdir(path):
+        is_batch = self.batch_var.get()
+
+        # --- File count preview (batch mode only) ---
+        if not is_batch:
             self.file_count_label.configure(text="")
-            return
-        extensions = (
-            '.mp4', '.mkv', '.avi', '.mov', '.flv',
-            '.mp3', '.wav', '.aac', '.flac', '.m4a', '.ogg'
-        )
-        count = sum(1 for f in os.listdir(path) if f.lower().endswith(extensions))
-        if count == 0:
-            self.file_count_label.configure(text="No compatible files", text_color="orange")
         else:
-            self.file_count_label.configure(
-                text=f"{count} file{'s' if count != 1 else ''} found",
-                text_color="#00cc44"
-            )
+            if not path or not os.path.isdir(path):
+                self.file_count_label.configure(text="")
+            else:
+                all_extensions = self.VIDEO_EXTENSIONS | self.AUDIO_EXTENSIONS
+                count = sum(1 for f in os.listdir(path) if os.path.splitext(f)[1].lower() in all_extensions)
+                if count == 0:
+                    self.file_count_label.configure(text="No compatible files", text_color="orange")
+                else:
+                    self.file_count_label.configure(
+                        text=f"{count} file{'s' if count != 1 else ''} found",
+                        text_color="#00cc44"
+                    )
+
+        # --- Auto-select output format (single file mode only) ---
+        if not is_batch and path and os.path.isfile(path):
+            ext = os.path.splitext(path)[1].lower()
+            if ext in self.VIDEO_EXTENSIONS:
+                self.format_menu.set("mp4")
+            elif ext in self.AUDIO_EXTENSIONS:
+                self.format_menu.set("mp3")
 
     # ------------------------------------------------------------------
     # Browse / output

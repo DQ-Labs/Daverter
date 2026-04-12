@@ -1,4 +1,4 @@
-# Daverter v0.5
+# Daverter v0.6
 
 A modern, dark-mode GUI for FFmpeg built with Python and CustomTkinter. Daverter allows you to easily convert media files using a sleek interface, supporting both single-file and batch folder processing.
 
@@ -31,11 +31,15 @@ Daverter validates and processes files with the following extensions:
 
 ### Output Formats (Write)
 You can convert files to the following formats using the dropdown menu:
-- `mp4`
-- `mp3`
+- `mp4` *(default for video input)*
+- `mp3` *(default for audio input)*
 - `gif`
 - `wav`
 - `mkv`
+- `flac`
+- `aac`
+- `webm`
+- `mov`
 
 ## Developer Setup (Running from Source)
 
@@ -92,6 +96,7 @@ To create a standalone `.exe` file that includes the FFmpeg binary:
 
 ## Version History
 
+- **v0.6**: Expanded output formats (FLAC, AAC, WEBM, MOV); auto-selects mp4/mp3 based on input type.
 - **v0.5**: Drag & drop support, resizable window, file count preview, clear log button.
 - **v0.4.4**: Added cancel button and determinate batch progress bar.
 - **v0.3**: Bug fixes — resolved FFmpeg PATH detection on Linux, improved batch error reporting, added requirements.txt.
