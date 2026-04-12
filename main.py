@@ -34,6 +34,8 @@ class VibeConverterApp(ctk.CTk):
 
         # Variables
         self.batch_var = ctk.BooleanVar(value=False)
+        self.current_process = None
+        self.cancelled = False
 
         # Layout configuration
         self.grid_columnconfigure(0, weight=1)
@@ -75,6 +77,11 @@ class VibeConverterApp(ctk.CTk):
                                             fg_color="#009933", hover_color="#006622",
                                             border_width=2, border_color="white")
         self.convert_button.grid(row=0, column=1, padx=20, pady=20)
+
+        self.cancel_button = ctk.CTkButton(self.action_frame, text="Cancel", command=self.cancel_conversion,
+                                           fg_color="#cc3333", hover_color="#991a1a",
+                                           border_width=2, border_color="white")
+        # Hidden until a conversion starts
 
         # --- Feedback Section ---
         self.log_textbox = ctk.CTkTextbox(self, state="disabled")
@@ -134,6 +141,12 @@ class VibeConverterApp(ctk.CTk):
             self.log_textbox.configure(state="disabled")
         self.after(0, _log)
 
+    def cancel_conversion(self):
+        self.cancelled = True
+        if self.current_process:
+            self.current_process.terminate()
+        self.log_message("Cancelling...")
+
     def start_conversion_thread(self):
         input_file = self.file_path_entry.get()
         if not input_file:
@@ -142,11 +155,20 @@ class VibeConverterApp(ctk.CTk):
 
         target_format = self.format_menu.get()
         is_batch = self.batch_var.get()
-        
-        # Disable button to prevent double clicks
-        self.convert_button.configure(state="disabled")
-        self.progress_bar.start()
-        
+        self.cancelled = False
+
+        # Swap Convert for Cancel
+        self.convert_button.grid_remove()
+        self.cancel_button.grid(row=0, column=1, padx=20, pady=20)
+
+        # Use determinate progress for batch, indeterminate for single
+        if is_batch:
+            self.progress_bar.configure(mode="determinate")
+            self.progress_bar.set(0)
+        else:
+            self.progress_bar.configure(mode="indeterminate")
+            self.progress_bar.start()
+
         conversion_thread = threading.Thread(target=self.run_conversion, args=(input_file, target_format, is_batch))
         conversion_thread.daemon = True
         conversion_thread.start()
@@ -197,6 +219,10 @@ class VibeConverterApp(ctk.CTk):
             total_files = len(files_to_convert)
 
             for i, current_file in enumerate(files_to_convert, 1):
+                if self.cancelled:
+                    self.log_message("Conversion cancelled by user.")
+                    break
+
                 filename = os.path.basename(current_file)
                 name, _ = os.path.splitext(filename)
                 output_filename = f"{name}_converted.{target_format}"
@@ -209,12 +235,12 @@ class VibeConverterApp(ctk.CTk):
 
                 # Construct command
                 command = [ffmpeg_cmd, "-i", current_file, "-y", output_path]
-                
+
                 creation_flags = 0
                 if sys.platform.startswith("win"):
                     creation_flags = subprocess.CREATE_NO_WINDOW
 
-                process = subprocess.Popen(
+                self.current_process = subprocess.Popen(
                     command,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
@@ -224,41 +250,56 @@ class VibeConverterApp(ctk.CTk):
 
                 # Read output log
                 output_lines = []
-                for line in process.stdout:
+                for line in self.current_process.stdout:
                     if line:
                         if not is_batch:
                             self.log_message(line.strip())
                         else:
                             output_lines.append(line.strip())
 
-                process.wait()
+                self.current_process.wait()
 
-                if process.returncode == 0:
+                if self.cancelled:
+                    self.log_message("Conversion cancelled by user.")
+                    break
+
+                if self.current_process.returncode == 0:
                     self.log_message(f"SUCCESS: Saved to {output_path}")
                 else:
-                    self.log_message(f"FAILURE: FFmpeg exited with code {process.returncode} for {filename}")
+                    self.log_message(f"FAILURE: FFmpeg exited with code {self.current_process.returncode} for {filename}")
                     if is_batch:
                         for line in output_lines[-10:]:
                             self.log_message(f"  {line}")
 
-            # Auto-open output folder
-            if sys.platform.startswith("win"):
-                try:
-                    os.startfile(output_dir)
-                    self.log_message(f"Opened output folder: {output_dir}")
-                except Exception as e:
-                    self.log_message(f"Could not open folder: {e}")
+                # Update batch progress bar
+                if is_batch:
+                    self.after(0, lambda val=i/total_files: self.progress_bar.set(val))
 
-            self.log_message("\n--- Task Completed ---")
+            self.current_process = None
+
+            if not self.cancelled:
+                # Auto-open output folder
+                if sys.platform.startswith("win"):
+                    try:
+                        os.startfile(output_dir)
+                        self.log_message(f"Opened output folder: {output_dir}")
+                    except Exception as e:
+                        self.log_message(f"Could not open folder: {e}")
+
+                self.log_message("\n--- Task Completed ---")
 
         except Exception as e:
             self.log_message(f"ERROR: {str(e)}")
         
         finally:
-            # Re-enable UI
-            self.after(0, lambda: self.progress_bar.stop())
-            self.after(0, lambda: self.progress_bar.set(0))
-            self.after(0, lambda: self.convert_button.configure(state="normal"))
+            def _reset_ui():
+                self.progress_bar.stop()
+                self.progress_bar.configure(mode="indeterminate")
+                self.progress_bar.set(0)
+                self.cancel_button.grid_remove()
+                self.convert_button.grid(row=0, column=1, padx=20, pady=20)
+                self.convert_button.configure(state="normal")
+            self.after(0, _reset_ui)
 
 if __name__ == "__main__":
     app = VibeConverterApp()
