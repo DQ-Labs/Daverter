@@ -31,7 +31,6 @@ class VibeConverterApp(ctk.CTk):
             self.iconbitmap(resource_path("app.ico"))
         except Exception as e:
             print(f"Warning: Could not load icon: {e}")
-            pass # Icon optional
 
         # Variables
         self.batch_var = ctk.BooleanVar(value=False)
@@ -155,17 +154,15 @@ class VibeConverterApp(ctk.CTk):
     def run_conversion(self, input_path, target_format, is_batch):
         try:
             ffmpeg_cmd = self.get_ffmpeg_path()
-            self.log_message(f"Debug: Using FFmpeg path: {ffmpeg_cmd}")
+            self.log_message(f"Info: Using FFmpeg path: {ffmpeg_cmd}")
 
-            if not os.path.exists(ffmpeg_cmd):
-                 self.log_message(f"ERROR: FFmpeg not found at {ffmpeg_cmd}")
-                 return
+            if os.path.isabs(ffmpeg_cmd) and not os.path.exists(ffmpeg_cmd):
+                self.log_message(f"ERROR: FFmpeg not found at {ffmpeg_cmd}")
+                return
 
             files_to_convert = []
 
             custom_output_dir = self.output_path_entry.get().strip()
-            if custom_output_dir == "Default (Source Folder)":
-                custom_output_dir = ""
 
             if is_batch:
                 if not os.path.isdir(input_path):
@@ -226,16 +223,23 @@ class VibeConverterApp(ctk.CTk):
                 )
 
                 # Read output log
+                output_lines = []
                 for line in process.stdout:
-                    if line and not is_batch: # Only flood log in single mode
-                        self.log_message(line.strip())
-                
+                    if line:
+                        if not is_batch:
+                            self.log_message(line.strip())
+                        else:
+                            output_lines.append(line.strip())
+
                 process.wait()
 
                 if process.returncode == 0:
                     self.log_message(f"SUCCESS: Saved to {output_path}")
                 else:
                     self.log_message(f"FAILURE: FFmpeg exited with code {process.returncode} for {filename}")
+                    if is_batch:
+                        for line in output_lines[-10:]:
+                            self.log_message(f"  {line}")
 
             # Auto-open output folder
             if sys.platform.startswith("win"):
