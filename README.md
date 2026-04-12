@@ -1,4 +1,4 @@
-# Daverter v0.4.4
+# Daverter v0.5
 
 A modern, dark-mode GUI for FFmpeg built with Python and CustomTkinter. Daverter allows you to easily convert media files using a sleek interface, supporting both single-file and batch folder processing.
 
@@ -17,6 +17,10 @@ You don't need Python or any development tools to run Daverter! Pre-compiled sta
 - **Batch Folder Mode**: Process entire directories of files at once (recursive).
 - **Custom Output Folder**: Choose where your converted files are saved, or default to a subfolder.
 - **Silent/Background Processing**: Conversions run in the background without annoying popup console windows.
+- **Drag & Drop**: Drop files or folders directly onto the window to load them instantly.
+- **Cancel Conversion**: Stop any in-progress conversion with a single click.
+- **Batch Progress Bar**: A real progress bar tracks how many files have been processed in batch mode.
+- **File Count Preview**: Batch mode shows how many compatible files are found in the selected folder before converting.
 
 ## Supported Formats
 
@@ -44,7 +48,7 @@ You can convert files to the following formats using the dropdown menu:
 1.  **Clone the repository** (or extract the source).
 2.  **Install Dependencies**:
     ```bash
-    pip install customtkinter
+    pip install -r requirements.txt
     ```
     (Note: `pyinstaller` is required if you plan to build the executable)
 
@@ -88,6 +92,7 @@ To create a standalone `.exe` file that includes the FFmpeg binary:
 
 ## Version History
 
+- **v0.5**: Drag & drop support, resizable window, file count preview, clear log button.
 - **v0.4.4**: Added cancel button and determinate batch progress bar.
 - **v0.3**: Bug fixes — resolved FFmpeg PATH detection on Linux, improved batch error reporting, added requirements.txt.
 - **v0.2**: Added automated cross-platform CI/CD builds (Windows and Linux binaries) via GitHub Actions.

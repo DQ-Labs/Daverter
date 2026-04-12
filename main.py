@@ -4,6 +4,7 @@ import subprocess
 import os
 import sys
 from tkinter import filedialog
+from tkinterdnd2 import TkinterDnD, DND_FILES
 
 # Set appearance and theme
 ctk.set_appearance_mode("Dark")
@@ -19,47 +20,67 @@ def resource_path(relative_path):
 
     return os.path.join(base_path, relative_path)
 
-class VibeConverterApp(ctk.CTk):
+class VibeConverterApp(ctk.CTk, TkinterDnD.DnDWrapper):
     def __init__(self):
         super().__init__()
+        self.TkdndVersion = TkinterDnD._require(self)
 
-        # Window setup
+        # Window setup — resizable with a minimum size
         self.title("Daverter")
-        self.geometry("600x500")
-        
+        self.geometry("600x540")
+        self.minsize(600, 540)
+
         try:
             self.iconbitmap(resource_path("app.ico"))
         except Exception as e:
             print(f"Warning: Could not load icon: {e}")
 
         # Variables
+        self.input_path_var = ctk.StringVar()
+        self.input_path_var.trace_add("write", self._on_batch_or_path_change)
         self.batch_var = ctk.BooleanVar(value=False)
+        self.batch_var.trace_add("write", self._on_batch_or_path_change)
         self.current_process = None
         self.cancelled = False
 
-        # Layout configuration
+        # Layout — row 3 is the log textbox (expands)
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(2, weight=1)  # Log area expands
+        self.grid_rowconfigure(3, weight=1)
 
         # --- Input Section ---
         self.input_frame = ctk.CTkFrame(self)
         self.input_frame.grid(row=0, column=0, padx=20, pady=(20, 10), sticky="ew")
         self.input_frame.grid_columnconfigure(0, weight=1)
 
-        self.file_path_entry = ctk.CTkEntry(self.input_frame, placeholder_text="Select a file...")
+        self.file_path_entry = ctk.CTkEntry(
+            self.input_frame,
+            textvariable=self.input_path_var,
+            placeholder_text="Select a file, or drag & drop here..."
+        )
         self.file_path_entry.grid(row=0, column=0, padx=(10, 5), pady=10, sticky="ew")
 
-        self.browse_button = ctk.CTkButton(self.input_frame, text="Browse", command=self.browse_file, width=80)
+        self.browse_button = ctk.CTkButton(
+            self.input_frame, text="Browse", command=self.browse_file, width=80
+        )
         self.browse_button.grid(row=0, column=1, padx=(5, 10), pady=10)
 
-        self.batch_mode_switch = ctk.CTkSwitch(self.input_frame, text="Batch Mode", variable=self.batch_var)
-        self.batch_mode_switch.grid(row=1, column=0, columnspan=2, padx=10, pady=(0, 10), sticky="w")
+        self.batch_mode_switch = ctk.CTkSwitch(
+            self.input_frame, text="Batch Mode", variable=self.batch_var
+        )
+        self.batch_mode_switch.grid(row=1, column=0, padx=10, pady=(0, 10), sticky="w")
+
+        self.file_count_label = ctk.CTkLabel(self.input_frame, text="")
+        self.file_count_label.grid(row=1, column=1, padx=(5, 10), pady=(0, 10), sticky="e")
 
         # --- Output Selection Row ---
-        self.output_path_entry = ctk.CTkEntry(self.input_frame, placeholder_text="Default (Source Folder)")
+        self.output_path_entry = ctk.CTkEntry(
+            self.input_frame, placeholder_text="Default (Source Folder)"
+        )
         self.output_path_entry.grid(row=2, column=0, padx=(10, 5), pady=(0, 10), sticky="ew")
 
-        self.output_browse_button = ctk.CTkButton(self.input_frame, text="Browse Output...", command=self.browse_output, width=80)
+        self.output_browse_button = ctk.CTkButton(
+            self.input_frame, text="Browse Output...", command=self.browse_output, width=80
+        )
         self.output_browse_button.grid(row=2, column=1, padx=(5, 10), pady=(0, 10))
 
         # --- Options & Action Section ---
@@ -70,42 +91,111 @@ class VibeConverterApp(ctk.CTk):
 
         self.formats = ["mp4", "mp3", "gif", "wav", "mkv"]
         self.format_menu = ctk.CTkOptionMenu(self.action_frame, values=self.formats)
-        self.format_menu.set("mp4") # Default
+        self.format_menu.set("mp4")
         self.format_menu.grid(row=0, column=0, padx=20, pady=20)
 
-        self.convert_button = ctk.CTkButton(self.action_frame, text="Convert", command=self.start_conversion_thread,
-                                            fg_color="#009933", hover_color="#006622",
-                                            border_width=2, border_color="white")
+        self.convert_button = ctk.CTkButton(
+            self.action_frame, text="Convert", command=self.start_conversion_thread,
+            fg_color="#009933", hover_color="#006622",
+            border_width=2, border_color="white"
+        )
         self.convert_button.grid(row=0, column=1, padx=20, pady=20)
 
-        self.cancel_button = ctk.CTkButton(self.action_frame, text="Cancel", command=self.cancel_conversion,
-                                           fg_color="#cc3333", hover_color="#991a1a",
-                                           border_width=2, border_color="white")
+        self.cancel_button = ctk.CTkButton(
+            self.action_frame, text="Cancel", command=self.cancel_conversion,
+            fg_color="#cc3333", hover_color="#991a1a",
+            border_width=2, border_color="white"
+        )
         # Hidden until a conversion starts
 
-        # --- Feedback Section ---
-        self.log_textbox = ctk.CTkTextbox(self, state="disabled")
-        self.log_textbox.grid(row=2, column=0, padx=20, pady=(10, 0), sticky="nsew")
+        # --- Log Header ---
+        self.log_header_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.log_header_frame.grid(row=2, column=0, padx=20, pady=(10, 0), sticky="ew")
+        self.log_header_frame.grid_columnconfigure(0, weight=1)
 
+        ctk.CTkLabel(self.log_header_frame, text="Log", anchor="w").grid(
+            row=0, column=0, sticky="w"
+        )
+        self.clear_log_button = ctk.CTkButton(
+            self.log_header_frame, text="Clear", width=60, command=self.clear_log,
+            fg_color="transparent", border_width=1
+        )
+        self.clear_log_button.grid(row=0, column=1, sticky="e")
+
+        # --- Log Textbox ---
+        self.log_textbox = ctk.CTkTextbox(self, state="disabled")
+        self.log_textbox.grid(row=3, column=0, padx=20, pady=(4, 0), sticky="nsew")
+
+        # --- Progress Bar ---
         self.progress_bar = ctk.CTkProgressBar(self, mode="indeterminate")
-        self.progress_bar.grid(row=3, column=0, padx=20, pady=20, sticky="ew")
+        self.progress_bar.grid(row=4, column=0, padx=20, pady=20, sticky="ew")
         self.progress_bar.set(0)
+
+        # Register whole window as drag-and-drop target
+        self.drop_target_register(DND_FILES)
+        self.dnd_bind("<<Drop>>", self.handle_drop)
+
+    # ------------------------------------------------------------------
+    # Drag & drop
+    # ------------------------------------------------------------------
+
+    def handle_drop(self, event):
+        """Accept a dragged file or folder onto the window."""
+        # tkinterdnd2 wraps paths containing spaces in curly braces
+        path = event.data.strip().strip("{}")
+        self.input_path_var.set(path)
+        if os.path.isdir(path):
+            self.batch_var.set(True)
+        else:
+            self.batch_var.set(False)
+
+    # ------------------------------------------------------------------
+    # File count preview
+    # ------------------------------------------------------------------
+
+    def _on_batch_or_path_change(self, *args):
+        """Update the file count label whenever the path or batch toggle changes."""
+        if not self.batch_var.get():
+            self.file_count_label.configure(text="")
+            return
+        path = self.input_path_var.get().strip()
+        if not path or not os.path.isdir(path):
+            self.file_count_label.configure(text="")
+            return
+        extensions = (
+            '.mp4', '.mkv', '.avi', '.mov', '.flv',
+            '.mp3', '.wav', '.aac', '.flac', '.m4a', '.ogg'
+        )
+        count = sum(1 for f in os.listdir(path) if f.lower().endswith(extensions))
+        if count == 0:
+            self.file_count_label.configure(text="No compatible files", text_color="orange")
+        else:
+            self.file_count_label.configure(
+                text=f"{count} file{'s' if count != 1 else ''} found",
+                text_color="#00cc44"
+            )
+
+    # ------------------------------------------------------------------
+    # Browse / output
+    # ------------------------------------------------------------------
 
     def browse_file(self):
         if self.batch_var.get():
             target = filedialog.askdirectory(parent=self)
         else:
             target = filedialog.askopenfilename(parent=self)
-            
         if target:
-            self.file_path_entry.delete(0, "end")
-            self.file_path_entry.insert(0, target)
+            self.input_path_var.set(target)
 
     def browse_output(self):
         target = filedialog.askdirectory(parent=self)
         if target:
             self.output_path_entry.delete(0, "end")
             self.output_path_entry.insert(0, target)
+
+    # ------------------------------------------------------------------
+    # FFmpeg path resolution
+    # ------------------------------------------------------------------
 
     def get_ffmpeg_path(self):
         """
@@ -121,16 +211,18 @@ class VibeConverterApp(ctk.CTk):
                 bundled_path = os.path.join(sys._MEIPASS, "bin", "ffmpeg.exe")
                 if os.path.exists(bundled_path):
                     return bundled_path
-            
             # Check local bin folder
             local_bin = os.path.join(os.getcwd(), "bin", "ffmpeg.exe")
             if os.path.exists(local_bin):
                 return local_bin
-                
-            # Fallback to system path or default assumption
+            # Fallback to system PATH
             return "ffmpeg.exe"
         else:
             return "ffmpeg"
+
+    # ------------------------------------------------------------------
+    # Logging
+    # ------------------------------------------------------------------
 
     def log_message(self, message):
         """Thread-safe way to append text to the log window."""
@@ -141,6 +233,16 @@ class VibeConverterApp(ctk.CTk):
             self.log_textbox.configure(state="disabled")
         self.after(0, _log)
 
+    def clear_log(self):
+        """Clear the log textbox."""
+        self.log_textbox.configure(state="normal")
+        self.log_textbox.delete("1.0", "end")
+        self.log_textbox.configure(state="disabled")
+
+    # ------------------------------------------------------------------
+    # Conversion
+    # ------------------------------------------------------------------
+
     def cancel_conversion(self):
         self.cancelled = True
         if self.current_process:
@@ -148,7 +250,7 @@ class VibeConverterApp(ctk.CTk):
         self.log_message("Cancelling...")
 
     def start_conversion_thread(self):
-        input_file = self.file_path_entry.get()
+        input_file = self.input_path_var.get().strip()
         if not input_file:
             self.log_message("Error: Please select a file or folder first.")
             return
@@ -169,7 +271,9 @@ class VibeConverterApp(ctk.CTk):
             self.progress_bar.configure(mode="indeterminate")
             self.progress_bar.start()
 
-        conversion_thread = threading.Thread(target=self.run_conversion, args=(input_file, target_format, is_batch))
+        conversion_thread = threading.Thread(
+            target=self.run_conversion, args=(input_file, target_format, is_batch)
+        )
         conversion_thread.daemon = True
         conversion_thread.start()
 
@@ -183,29 +287,26 @@ class VibeConverterApp(ctk.CTk):
                 return
 
             files_to_convert = []
-
             custom_output_dir = self.output_path_entry.get().strip()
 
             if is_batch:
                 if not os.path.isdir(input_path):
                     self.log_message(f"ERROR: {input_path} is not a valid directory.")
                     return
-                
-                # Video and Audio extensions
-                extensions = ('.mp4', '.mkv', '.avi', '.mov', '.flv', '.mp3', '.wav', '.aac', '.flac', '.m4a', '.ogg')
+
+                extensions = (
+                    '.mp4', '.mkv', '.avi', '.mov', '.flv',
+                    '.mp3', '.wav', '.aac', '.flac', '.m4a', '.ogg'
+                )
                 for f in os.listdir(input_path):
                     if f.lower().endswith(extensions):
                         files_to_convert.append(os.path.join(input_path, f))
-                
+
                 if not files_to_convert:
                     self.log_message("ERROR: No compatible files found in folder.")
                     return
-                
-                if custom_output_dir:
-                    output_dir = custom_output_dir
-                else:
-                    output_dir = os.path.join(input_path, "converted")
-                
+
+                output_dir = custom_output_dir if custom_output_dir else os.path.join(input_path, "converted")
                 os.makedirs(output_dir, exist_ok=True)
                 self.log_message(f"Batch mode started. Found {len(files_to_convert)} files.")
             else:
@@ -233,7 +334,6 @@ class VibeConverterApp(ctk.CTk):
                 else:
                     self.log_message(f"Starting conversion: {filename} -> {output_filename}")
 
-                # Construct command
                 command = [ffmpeg_cmd, "-i", current_file, "-y", output_path]
 
                 creation_flags = 0
@@ -248,7 +348,6 @@ class VibeConverterApp(ctk.CTk):
                     creationflags=creation_flags
                 )
 
-                # Read output log
                 output_lines = []
                 for line in self.current_process.stdout:
                     if line:
@@ -266,31 +365,30 @@ class VibeConverterApp(ctk.CTk):
                 if self.current_process.returncode == 0:
                     self.log_message(f"SUCCESS: Saved to {output_path}")
                 else:
-                    self.log_message(f"FAILURE: FFmpeg exited with code {self.current_process.returncode} for {filename}")
+                    self.log_message(
+                        f"FAILURE: FFmpeg exited with code {self.current_process.returncode} for {filename}"
+                    )
                     if is_batch:
                         for line in output_lines[-10:]:
                             self.log_message(f"  {line}")
 
-                # Update batch progress bar
                 if is_batch:
-                    self.after(0, lambda val=i/total_files: self.progress_bar.set(val))
+                    self.after(0, lambda val=i / total_files: self.progress_bar.set(val))
 
             self.current_process = None
 
             if not self.cancelled:
-                # Auto-open output folder
                 if sys.platform.startswith("win"):
                     try:
                         os.startfile(output_dir)
                         self.log_message(f"Opened output folder: {output_dir}")
                     except Exception as e:
                         self.log_message(f"Could not open folder: {e}")
-
                 self.log_message("\n--- Task Completed ---")
 
         except Exception as e:
             self.log_message(f"ERROR: {str(e)}")
-        
+
         finally:
             def _reset_ui():
                 self.progress_bar.stop()
@@ -300,6 +398,7 @@ class VibeConverterApp(ctk.CTk):
                 self.convert_button.grid(row=0, column=1, padx=20, pady=20)
                 self.convert_button.configure(state="normal")
             self.after(0, _reset_ui)
+
 
 if __name__ == "__main__":
     app = VibeConverterApp()

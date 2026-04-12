@@ -21,7 +21,7 @@ jobs:
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install customtkinter pyinstaller
+          pip install customtkinter tkinterdnd2 pyinstaller
 
       - name: Download FFmpeg (Windows)
         run: |
@@ -59,7 +59,7 @@ jobs:
       - name: Install Python Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install customtkinter pyinstaller
+          pip install customtkinter tkinterdnd2 pyinstaller
 
       - name: Build with PyInstaller (Linux)
         run: |
