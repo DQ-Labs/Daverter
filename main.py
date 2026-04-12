@@ -88,18 +88,26 @@ class VibeConverterApp(ctk.CTk, TkinterDnD.DnDWrapper):
         self.action_frame.grid(row=1, column=0, padx=20, pady=10, sticky="ew")
         self.action_frame.grid_columnconfigure(0, weight=1)
         self.action_frame.grid_columnconfigure(1, weight=1)
+        self.action_frame.grid_columnconfigure(2, weight=1)
 
         self.formats = ["mp4", "mp3", "gif", "wav", "mkv", "flac", "aac", "webm", "mov"]
         self.format_menu = ctk.CTkOptionMenu(self.action_frame, values=self.formats)
         self.format_menu.set("mp4")
         self.format_menu.grid(row=0, column=0, padx=20, pady=20)
 
+        self.preset_menu = ctk.CTkOptionMenu(
+            self.action_frame,
+            values=list(self.PRESETS.keys())
+        )
+        self.preset_menu.set("Default")
+        self.preset_menu.grid(row=0, column=1, padx=20, pady=20)
+
         self.convert_button = ctk.CTkButton(
             self.action_frame, text="Convert", command=self.start_conversion_thread,
             fg_color="#009933", hover_color="#006622",
             border_width=2, border_color="white"
         )
-        self.convert_button.grid(row=0, column=1, padx=20, pady=20)
+        self.convert_button.grid(row=0, column=2, padx=20, pady=20)
 
         self.cancel_button = ctk.CTkButton(
             self.action_frame, text="Cancel", command=self.cancel_conversion,
@@ -157,6 +165,49 @@ class VibeConverterApp(ctk.CTk, TkinterDnD.DnDWrapper):
     VIDEO_EXTENSIONS = {'.mp4', '.mkv', '.avi', '.mov', '.flv', '.webm'}
     AUDIO_EXTENSIONS = {'.mp3', '.wav', '.aac', '.flac', '.m4a', '.ogg'}
 
+    # Output formats classed by type
+    VIDEO_OUTPUT_FORMATS = {'mp4', 'mkv', 'mov', 'webm', 'gif'}
+    AUDIO_OUTPUT_FORMATS = {'mp3', 'aac', 'flac', 'wav'}
+    LOSSLESS_OUTPUT_FORMATS = {'flac', 'wav'}
+
+    # Preset FFmpeg flags keyed by preset name, then 'video' / 'audio'
+    PRESETS = {
+        "Default": {},
+        "High Quality": {
+            "video": ["-crf", "18", "-preset", "slow"],
+            "audio": ["-b:a", "320k"],
+        },
+        "Small File": {
+            "video": ["-crf", "28", "-preset", "fast"],
+            "audio": ["-b:a", "128k"],
+        },
+        "Web Optimized": {
+            "video": ["-crf", "23", "-preset", "medium", "-movflags", "+faststart"],
+            "audio": ["-b:a", "192k"],
+        },
+    }
+
+    def get_preset_flags(self, target_format, preset_name):
+        """Return the FFmpeg flags for the chosen preset and output format."""
+        if preset_name == "Default" or target_format not in (
+            self.VIDEO_OUTPUT_FORMATS | self.AUDIO_OUTPUT_FORMATS
+        ):
+            return []
+        preset = self.PRESETS[preset_name]
+        if target_format in self.AUDIO_OUTPUT_FORMATS:
+            # Lossless formats don't benefit from bitrate flags
+            if target_format in self.LOSSLESS_OUTPUT_FORMATS:
+                return []
+            return preset.get("audio", [])
+        # Video path
+        if target_format == "gif":
+            return []  # GIF has no meaningful CRF/preset
+        if target_format == "webm":
+            # VP9 uses constrained quality mode instead of libx264 presets
+            webm_crf = {"High Quality": "20", "Small File": "33", "Web Optimized": "30"}
+            return ["-crf", webm_crf.get(preset_name, "30"), "-b:v", "0"]
+        return preset.get("video", [])
+
     def _on_batch_or_path_change(self, *args):
         """Update file count label and auto-select output format when path or batch toggle changes."""
         path = self.input_path_var.get().strip()
@@ -170,7 +221,11 @@ class VibeConverterApp(ctk.CTk, TkinterDnD.DnDWrapper):
                 self.file_count_label.configure(text="")
             else:
                 all_extensions = self.VIDEO_EXTENSIONS | self.AUDIO_EXTENSIONS
-                count = sum(1 for f in os.listdir(path) if os.path.splitext(f)[1].lower() in all_extensions)
+                count = sum(
+                    1 for _, _, files in os.walk(path)
+                    for f in files
+                    if os.path.splitext(f)[1].lower() in all_extensions
+                )
                 if count == 0:
                     self.file_count_label.configure(text="No compatible files", text_color="orange")
                 else:
@@ -273,7 +328,7 @@ class VibeConverterApp(ctk.CTk, TkinterDnD.DnDWrapper):
 
         # Swap Convert for Cancel
         self.convert_button.grid_remove()
-        self.cancel_button.grid(row=0, column=1, padx=20, pady=20)
+        self.cancel_button.grid(row=0, column=2, padx=20, pady=20)
 
         # Use determinate progress for batch, indeterminate for single
         if is_batch:
@@ -300,19 +355,21 @@ class VibeConverterApp(ctk.CTk, TkinterDnD.DnDWrapper):
 
             files_to_convert = []
             custom_output_dir = self.output_path_entry.get().strip()
+            preset_name = self.preset_menu.get()
+            preset_flags = self.get_preset_flags(target_format, preset_name)
+
+            all_extensions = self.VIDEO_EXTENSIONS | self.AUDIO_EXTENSIONS
 
             if is_batch:
                 if not os.path.isdir(input_path):
                     self.log_message(f"ERROR: {input_path} is not a valid directory.")
                     return
 
-                extensions = (
-                    '.mp4', '.mkv', '.avi', '.mov', '.flv',
-                    '.mp3', '.wav', '.aac', '.flac', '.m4a', '.ogg'
-                )
-                for f in os.listdir(input_path):
-                    if f.lower().endswith(extensions):
-                        files_to_convert.append(os.path.join(input_path, f))
+                # Recurse into subdirectories with os.walk
+                for root, _, files in os.walk(input_path):
+                    for f in files:
+                        if os.path.splitext(f)[1].lower() in all_extensions:
+                            files_to_convert.append(os.path.join(root, f))
 
                 if not files_to_convert:
                     self.log_message("ERROR: No compatible files found in folder.")
@@ -339,14 +396,23 @@ class VibeConverterApp(ctk.CTk, TkinterDnD.DnDWrapper):
                 filename = os.path.basename(current_file)
                 name, _ = os.path.splitext(filename)
                 output_filename = f"{name}_converted.{target_format}"
-                output_path = os.path.join(output_dir, output_filename)
+
+                # Mirror subdirectory structure for recursive batch output
+                if is_batch:
+                    rel_dir = os.path.relpath(os.path.dirname(current_file), input_path)
+                    file_output_dir = os.path.normpath(os.path.join(output_dir, rel_dir))
+                    os.makedirs(file_output_dir, exist_ok=True)
+                else:
+                    file_output_dir = output_dir
+
+                output_path = os.path.join(file_output_dir, output_filename)
 
                 if is_batch:
                     self.log_message(f"\nProcessing file {i} of {total_files}: {filename}...")
                 else:
                     self.log_message(f"Starting conversion: {filename} -> {output_filename}")
 
-                command = [ffmpeg_cmd, "-i", current_file, "-y", output_path]
+                command = [ffmpeg_cmd, "-i", current_file] + preset_flags + ["-y", output_path]
 
                 creation_flags = 0
                 if sys.platform.startswith("win"):
@@ -407,7 +473,7 @@ class VibeConverterApp(ctk.CTk, TkinterDnD.DnDWrapper):
                 self.progress_bar.configure(mode="indeterminate")
                 self.progress_bar.set(0)
                 self.cancel_button.grid_remove()
-                self.convert_button.grid(row=0, column=1, padx=20, pady=20)
+                self.convert_button.grid(row=0, column=2, padx=20, pady=20)
                 self.convert_button.configure(state="normal")
             self.after(0, _reset_ui)
 
