@@ -21,7 +21,7 @@ jobs:
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install customtkinter pyinstaller
+          pip install customtkinter tkinterdnd2 pyinstaller
 
       - name: Download FFmpeg (Windows)
         run: |
@@ -32,7 +32,7 @@ jobs:
 
       - name: Build with PyInstaller (Windows)
         run: |
-          pyinstaller --noconfirm --onefile --windowed --name "Daverter-Win" --icon="app.ico" --add-data "app.ico;." --add-data "bin/ffmpeg.exe;bin" --clean main.py
+          pyinstaller --noconfirm --onefile --windowed --name "Daverter-Win" --icon="app.ico" --add-data "app.ico;." --add-data "bin/ffmpeg.exe;bin" --collect-all tkinterdnd2 --clean main.py
 
       - name: Upload Windows Artifact
         uses: actions/upload-artifact@v4
@@ -59,11 +59,11 @@ jobs:
       - name: Install Python Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install customtkinter pyinstaller
+          pip install customtkinter tkinterdnd2 pyinstaller
 
       - name: Build with PyInstaller (Linux)
         run: |
-          pyinstaller --noconfirm --onefile --windowed --name "Daverter-Linux" --icon="app.ico" --add-data "app.ico:." --clean main.py
+          pyinstaller --noconfirm --onefile --windowed --name "Daverter-Linux" --icon="app.ico" --add-data "app.ico:." --collect-all tkinterdnd2 --clean main.py
 
       - name: Upload Linux Artifact
         uses: actions/upload-artifact@v4
