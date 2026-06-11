@@ -2,6 +2,7 @@ import customtkinter as ctk
 import threading
 import subprocess
 import os
+import shutil
 import sys
 from tkinter import filedialog
 
@@ -104,27 +105,24 @@ class VibeConverterApp(ctk.CTk):
     def get_ffmpeg_path(self):
         """
         Cross-platform helper to find ffmpeg.
-        Linux: Relies on system PATH.
-        Windows: Checks local bin/ or sys._MEIPASS (PyInstaller).
+        Windows: Checks sys._MEIPASS (PyInstaller) and local bin/, then system PATH.
+        Other platforms: Relies on system PATH.
+        Returns None if ffmpeg cannot be found.
         """
-        if sys.platform.startswith("linux"):
-            return "ffmpeg"
-        elif sys.platform.startswith("win"):
+        if sys.platform.startswith("win"):
             # Check for bundled executable (PyInstaller)
             if hasattr(sys, "_MEIPASS"):
                 bundled_path = os.path.join(sys._MEIPASS, "bin", "ffmpeg.exe")
                 if os.path.exists(bundled_path):
                     return bundled_path
-            
-            # Check local bin folder
-            local_bin = os.path.join(os.getcwd(), "bin", "ffmpeg.exe")
+
+            # Check bin folder next to the script (independent of launch directory)
+            local_bin = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bin", "ffmpeg.exe")
             if os.path.exists(local_bin):
                 return local_bin
-                
-            # Fallback to system path or default assumption
-            return "ffmpeg.exe"
-        else:
-            return "ffmpeg"
+
+        # Fall back to system PATH on all platforms
+        return shutil.which("ffmpeg")
 
     def log_message(self, message):
         """Thread-safe way to append text to the log window."""
@@ -155,11 +153,10 @@ class VibeConverterApp(ctk.CTk):
     def run_conversion(self, input_path, target_format, is_batch):
         try:
             ffmpeg_cmd = self.get_ffmpeg_path()
+            if not ffmpeg_cmd:
+                self.log_message("ERROR: FFmpeg not found. Install it on your PATH or place ffmpeg.exe in the bin/ folder.")
+                return
             self.log_message(f"Debug: Using FFmpeg path: {ffmpeg_cmd}")
-
-            if not os.path.exists(ffmpeg_cmd):
-                 self.log_message(f"ERROR: FFmpeg not found at {ffmpeg_cmd}")
-                 return
 
             files_to_convert = []
 
@@ -221,7 +218,9 @@ class VibeConverterApp(ctk.CTk):
                     command,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
-                    universal_newlines=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
                     creationflags=creation_flags
                 )
 

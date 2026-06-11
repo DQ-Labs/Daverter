@@ -14,14 +14,14 @@ You don't need Python or any development tools to run Daverter! Pre-compiled sta
 
 - **Modern Dark-Mode GUI**: Built with CustomTkinter for a native-looking, professional interface.
 - **Single File Conversion**: Quickly convert individual video or audio files.
-- **Batch Folder Mode**: Process entire directories of files at once (recursive).
+- **Batch Folder Mode**: Process all media files in a folder at once (top level only, not recursive).
 - **Custom Output Folder**: Choose where your converted files are saved, or default to a subfolder.
 - **Silent/Background Processing**: Conversions run in the background without annoying popup console windows.
 
 ## Supported Formats
 
 ### Input Formats (Read)
-Daverter validates and processes files with the following extensions:
+In batch mode, Daverter picks up files with the following extensions (in single-file mode, any file FFmpeg can read will work):
 - **Video**: `.mp4`, `.mkv`, `.avi`, `.mov`, `.flv`
 - **Audio**: `.mp3`, `.wav`, `.aac`, `.flac`, `.m4a`, `.ogg`
 
@@ -37,7 +37,7 @@ You can convert files to the following formats using the dropdown menu:
 
 ### Prerequisites
 - **Python 3.x** installed.
-- **FFmpeg**: You must have `ffmpeg.exe` available.
+- **FFmpeg**: Either installed on your system `PATH`, or `ffmpeg.exe` placed in the project's `bin/` folder (FFmpeg 8.x recommended).
 
 ### Installation
 
@@ -48,9 +48,11 @@ You can convert files to the following formats using the dropdown menu:
     ```
     (Note: `pyinstaller` is required if you plan to build the executable)
 
-3.  **FFmpeg Setup (Crucial)**:
+3.  **FFmpeg Setup**:
+
+    If FFmpeg is already installed on your system `PATH`, Daverter will find it automatically and you can skip this step. To use a local copy instead (required for building the standalone executable):
     -   Create a folder named `bin` in the project root directory.
-    -   Download `ffmpeg.exe` (from [ffmpeg.org](https://ffmpeg.org/download.html) or similar).
+    -   Download `ffmpeg.exe` (e.g. the latest release build from [gyan.dev](https://www.gyan.dev/ffmpeg/builds/) or [ffmpeg.org](https://ffmpeg.org/download.html)).
     -   Place `ffmpeg.exe` inside the `bin/` folder.
     -   Structure should look like:
         ```
@@ -88,6 +90,7 @@ To create a standalone `.exe` file that includes the FFmpeg binary:
 
 ## Version History
 
+- **v0.2.1** (unreleased): Updated bundled FFmpeg to 8.1.1. FFmpeg is now found on the system `PATH` when no bundled copy exists; fixed launch-directory dependence and unicode handling in conversion logs.
 - **v0.2**: Added automated cross-platform CI/CD builds (Windows and Linux binaries) via GitHub Actions.
 - **v0.1**: Initial release. Basic FFmpeg integration with CustomTkinter GUI.
 
