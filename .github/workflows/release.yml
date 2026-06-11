@@ -11,10 +11,10 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
 
@@ -35,7 +35,7 @@ jobs:
           pyinstaller --noconfirm --onefile --windowed --name "Daverter-Win" --icon="app.ico" --add-data "app.ico;." --add-data "bin/ffmpeg.exe;bin" --collect-all tkinterdnd2 --clean main.py
 
       - name: Upload Windows Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: windows-executable
           path: dist/Daverter-Win.exe
@@ -44,10 +44,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
 
@@ -66,7 +66,7 @@ jobs:
           pyinstaller --noconfirm --onefile --windowed --name "Daverter-Linux" --icon="app.ico" --add-data "app.ico:." --collect-all tkinterdnd2 --clean main.py
 
       - name: Upload Linux Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: linux-executable
           path: dist/Daverter-Linux
@@ -79,12 +79,12 @@ jobs:
       contents: write
     steps:
       - name: Download Windows Artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: windows-executable
 
       - name: Download Linux Artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: linux-executable
 
@@ -92,7 +92,7 @@ jobs:
         run: chmod +x Daverter-Linux
 
       - name: Create Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             Daverter-Win.exe
