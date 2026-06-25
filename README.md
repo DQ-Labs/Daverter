@@ -98,7 +98,8 @@ To create a standalone `.exe` file that includes the FFmpeg binary:
 
 ## Version History
 
-- **v0.7** (unreleased): Updated bundled FFmpeg to 8.1.1; FFmpeg is now resolved from the system `PATH` when no bundled copy exists; fixed launch-directory dependence and unicode handling in conversion logs.
+- **v0.7.1**: Updated bundled FFmpeg to 8.1.2 (security fixes); release workflow now builds from the stable 8.1 branch and verifies the bundled version is >= 8.1.2.
+- **v0.7**: FFmpeg is now resolved from the system `PATH` when no bundled copy exists; fixed launch-directory dependence and unicode handling in conversion logs.
 - **v0.6.5**: Conversion presets (Default / High Quality / Small File / Web Optimized); recursive batch mode mirrors subfolder structure.
 - **v0.6**: Expanded output formats (FLAC, AAC, WEBM, MOV); auto-selects mp4/mp3 based on input type.
 - **v0.5**: Drag & drop support, resizable window, file count preview, clear log button.

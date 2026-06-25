@@ -25,10 +25,31 @@ jobs:
 
       - name: Download FFmpeg (Windows)
         run: |
-          Invoke-WebRequest -Uri "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip" -OutFile "ffmpeg.zip"
+          # Track the 8.1 release branch (currently FFmpeg 8.1.2) rather than the
+          # unstable master nightly. The verify step below fails the build if the
+          # bundled binary is older than 8.1.2, so we never ship a vulnerable copy.
+          Invoke-WebRequest -Uri "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n8.1-latest-win64-gpl-8.1.zip" -OutFile "ffmpeg.zip"
           Expand-Archive -Path "ffmpeg.zip" -DestinationPath "ffmpeg_extracted"
           New-Item -ItemType Directory -Force -Path "bin"
           Move-Item -Path "ffmpeg_extracted\*\bin\ffmpeg.exe" -Destination "bin\ffmpeg.exe"
+
+      - name: Verify FFmpeg version (>= 8.1.2)
+        run: |
+          $versionLine = (& "bin\ffmpeg.exe" -version | Select-Object -First 1)
+          Write-Host $versionLine
+          if ($versionLine -notmatch '\d+\.\d+(\.\d+)?') {
+            Write-Error "Could not parse FFmpeg version from: $versionLine"
+            exit 1
+          }
+          $parts = $Matches[0].Split('.')
+          while ($parts.Count -lt 3) { $parts += '0' }
+          $version = [version]($parts -join '.')
+          $minimum = [version]'8.1.2'
+          if ($version -lt $minimum) {
+            Write-Error "Bundled FFmpeg $version is older than required $minimum (security fix)."
+            exit 1
+          }
+          Write-Host "OK: bundled FFmpeg $version satisfies minimum $minimum"
 
       - name: Build with PyInstaller (Windows)
         run: |
